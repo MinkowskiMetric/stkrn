@@ -53,6 +53,20 @@ RMCALLCTXT_ReturnCR3:
   .balign 4
 RMCALLCTXT_SIZE:
 
+# STAGE2STARTCTX
+  .struct 0
+  .balign 4
+STAGE2STARTCTX_StructSize:
+  .struct STAGE2STARTCTX_StructSize + 4
+  .balign 4
+STAGE2STARTCTX_Print:
+  .struct STAGE2STARTCTX_Print + 4
+  .balign 4
+STAGE2STARTCTX_CallRealMode:
+  .struct STAGE2STARTCTX_CallRealMode + 4
+  .balign 4
+STAGE2STARTCTX_SIZE:
+  
 # FILETABLE_HDR
   .struct 0
   .balign 4
@@ -550,8 +564,17 @@ Stage15Entry32:
   jmp 1b
   
 2:
-  mov ecx, STAGE2_BASE_ADDRESS
-  call PMPrintAndHalt
+  # allocate some space on the stack for the handover function
+  sub esp, STAGE2STARTCTX_SIZE
+  mov ecx, esp
+  
+  mov dword ptr [ecx + STAGE2STARTCTX_StructSize], 0x7c00 + offset STAGE2STARTCTX_SIZE
+  mov dword ptr [ecx + STAGE2STARTCTX_Print], 0x7c00 + offset PMPrint
+  mov dword ptr [ecx + STAGE2STARTCTX_CallRealMode], 0x7c00 + offset LeaveProtectedMode
+  
+  # Then call into the stage 2 loader
+  mov eax, STAGE2_BASE_ADDRESS
+  jmp eax
 
 InvalidBootLoaderFileTable:
   mov ecx, 0x7c00 + offset InvalidKernelFileTable
