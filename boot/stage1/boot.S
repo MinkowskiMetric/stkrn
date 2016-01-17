@@ -53,6 +53,37 @@ RMCALLCTXT_ReturnCR3:
   .balign 4
 RMCALLCTXT_SIZE:
 
+# FILETABLE_HDR
+  .struct 0
+  .balign 4
+FILETABLE_HDR_Magic1:
+  .struct FILETABLE_HDR_Magic1 + 4
+  .balign 4
+FILETABLE_HDR_Magic2:
+  .struct FILETABLE_HDR_Magic2 + 4
+  .balign 4
+FILETABLE_HDR_HeaderSize:
+  .struct FILETABLE_HDR_HeaderSize + 4
+  .balign 4
+FILETABLE_HDR_FileCount:
+  .struct FILETABLE_HDR_FileCount + 4
+  .balign 4
+FILETABLE_HDR_SIZE:
+
+# FILETABLE_ENTRY
+  .struct 0
+  .balign 1
+FILETABLE_ENTRY_Name:
+  .struct FILETABLE_ENTRY_Name + 16
+  .balign 2
+FILETABLE_ENTRY_LengthInSectors:
+  .struct FILETABLE_ENTRY_LengthInSectors + 2
+  .balign 2
+FILETABLE_ENTRY_Padding:
+  .struct FILETABLE_ENTRY_Padding + 2
+  .balign 2
+FILETABLE_ENTRY_SIZE:
+
 .text
 .code16
 .org 0x0                                        
@@ -80,12 +111,13 @@ PM_STACK_TOP        = 0x00021c00
 
 KERNEL_FT_BUFFER    = 0x00021c00
 SECTOR_BUFFER       = 0x00021e00
-STAGE2_LOAD_BUFFER  = 0x00028000
+STAGE2_LOAD_BUFFER  = 0x00030000
 STAGE2_BASE_ADDRESS = 0xc0030000
-STAGE2_MAX_SECTORS  = (STAGE2_BASE_ADDRESS - STAGE2_LOAD_BUFFER) / 0x200
+STAGE2_LIMIT_ADDR   = 0xc0100000
+STAGE2_MAX_SECTORS  = (STAGE2_LIMIT_ADDR - STAGE2_BASE_ADDRESS) / 0x200
 
-# FT_MAGIC1           = 'sots'
-# FT_MAGIC2           = 'toob'
+FT_MAGIC1           = 0x736f7473
+FT_MAGIC2           = 0x746f6f62
 
 PM_PML4_ADDRESS     = 0x00022000
 PM_PDPT_ADDRESS     = 0x00023000
@@ -94,8 +126,8 @@ PM_PDT1_ADDRESS     = 0x00025000
 PM_PDT2_ADDRESS     = 0x00026000
 PM_PDT3_ADDRESS     = 0x00027000
 
-KERNEL_FILE_TABLE_SECTOR = 6
-STAGE2_START_SECTOR      = 7
+KERNEL_FILE_TABLE_SECTOR = 5
+STAGE2_START_SECTOR      = 6
 
 PTE_PRESENT         = 0x00000001
 PTE_WRITEABLE       = 0x00000002 
@@ -355,12 +387,85 @@ ProcessRealModeRequest_Exit:
 
 .endfunc
 
+.macro SAVE_CONTEXT_TO_STACK
+  push eax
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  push ds
+  push es
+  pushfd
+.endm
+
+.macro RESTORE_CONTEXT_FROM_STACK
+  popfd
+  pop es
+  pop ds
+  pop edi
+  pop esi
+  pop edx
+  pop ecx
+  pop ebx
+  pop eax
+.endm
+
+.macro SAVE_CALL_CONTEXT_TO_STACK
+  mov ax, ds
+  mov word ptr [CallContextSeg], ax
+  mov word ptr [CallContextOff], bx
+  
+  push dword ptr [bx + RMCALLCTXT_EAX]
+  push dword ptr [bx + RMCALLCTXT_EBX]
+  push dword ptr [bx + RMCALLCTXT_ECX]
+  push dword ptr [bx + RMCALLCTXT_EDX]
+  push dword ptr [bx + RMCALLCTXT_ESI]
+  push dword ptr [bx + RMCALLCTXT_EDI]
+  push word ptr [bx + RMCALLCTXT_DS]
+  push word ptr [bx + RMCALLCTXT_ES]
+  pushfd
+.endm
+
+.macro RESTORE_CALL_CONTEXT_FROM_STACK
+  # need to recover the data segment which should be the same as the code segment
+  mov ax, cs
+  mov ds, ax
+  
+  mov ax, word ptr [CallContextSeg]
+  mov es, ax
+  mov si, word ptr [CallContextOff]
+
+  pop dword ptr es:[si + RMCALLCTXT_EFLAGS]
+  pop word ptr es:[si + RMCALLCTXT_ES]
+  pop word ptr es:[si + RMCALLCTXT_DS]
+  pop dword ptr es:[si + RMCALLCTXT_EDI]
+  pop dword ptr es:[si + RMCALLCTXT_ESI]
+  pop dword ptr es:[si + RMCALLCTXT_EDX]
+  pop dword ptr es:[si + RMCALLCTXT_ECX]
+  pop dword ptr es:[si + RMCALLCTXT_EBX]
+  pop dword ptr es:[si + RMCALLCTXT_EAX]
+.endm
+
 .func ProcessIntXX
 ProcessIntXX:
 
-  cli
-  hlt
-  .ascii "ProcessIntXX"
+  mov cl, byte ptr [bx + RMCALLCTXT_Vector]
+  mov byte ptr [IntVectorCode], cl
+
+  SAVE_CONTEXT_TO_STACK
+  SAVE_CALL_CONTEXT_TO_STACK
+  RESTORE_CONTEXT_FROM_STACK
+
+  .byte 0xcd
+IntVectorCode:
+  .byte 0x00
+
+  SAVE_CONTEXT_TO_STACK
+  RESTORE_CALL_CONTEXT_FROM_STACK
+  RESTORE_CONTEXT_FROM_STACK
+
+  ret
 
 .endfunc
 
@@ -392,8 +497,68 @@ Stage15Entry32:
   or eax, CR0_PG
   mov cr0, eax
 
-  mov ecx, 0x7c00 + OFFSET TestString
+  # Load the next sector from the disk
+  mov edx, KERNEL_FT_BUFFER
+  mov ecx, KERNEL_FILE_TABLE_SECTOR
+  call PMLoadLinearSector
+  
+  # verify the header magic number
+  mov ebx, KERNEL_FT_BUFFER
+  mov eax, dword ptr [ebx + FILETABLE_HDR_Magic1]
+  cmp eax, FT_MAGIC1
+  jne InvalidBootLoaderFileTable
+  
+  mov eax, dword ptr [ebx + FILETABLE_HDR_Magic2]
+  cmp eax, FT_MAGIC2
+  jne InvalidBootLoaderFileTable
+
+  # Then check there is at least one entry in the file table
+  mov eax, dword ptr [ebx + FILETABLE_HDR_FileCount]
+  cmp eax, 1
+  jl InvalidBootLoaderFileTable
+
+  # and check that the whole file table fit into a single sector
+  mov ecx, FILETABLE_ENTRY_SIZE
+  mul ecx
+  add eax, dword ptr [ebx + FILETABLE_HDR_HeaderSize]
+  cmp eax, 0x200
+  jg InvalidBootLoaderFileTable
+
+  # Check it will fit into the memory region we have
+  mov eax, dword ptr [ebx + FILETABLE_HDR_SIZE + 16]
+  cmp eax, STAGE2_MAX_SECTORS
+  jg Stage2TooBig
+
+  # Load the stage 2 loader into memory. It is a raw executable
+  # so it is easy to load here
+  mov esi, STAGE2_START_SECTOR
+  mov edi, STAGE2_LOAD_BUFFER
+1:
+  mov ecx, 0x7c00 + OFFSET LoadingNextSector
+  call PMPrint
+  
+  mov ecx, esi
+  mov edx, edi
+  call PMLoadLinearSector
+
+  mov eax, dword ptr [ebx + FILETABLE_HDR_SIZE + 16]
+  add eax, STAGE2_START_SECTOR - 1
+  cmp eax, esi
+  jle 2f
+  inc esi
+  add edi, 0x200
+  jmp 1b
+  
+2:
+  mov ecx, STAGE2_BASE_ADDRESS
   call PMPrintAndHalt
+
+InvalidBootLoaderFileTable:
+  mov ecx, 0x7c00 + offset InvalidKernelFileTable
+  jmp PMPrintAndHalt
+Stage2TooBig:
+  mov ecx, 0x7c00 + offset Stage2TooBigMessage
+  jmp PMPrintAndHalt
 
 .endfunc
 
@@ -444,6 +609,74 @@ PMPrint:
   mov ecx, dword ptr [ebx + RMCALLCTXT_FramePtr]
   sub edi, ecx
   mov dword ptr [ebx + RMCALLCTXT_FrameSize], edi
+
+  mov ecx, ebx
+  call LeaveProtectedMode
+
+  mov esp, ebp
+  pop ebp
+  pop edi
+  pop ebx
+  ret
+
+.endfunc
+
+.func PMLoadLinearSector
+PMLoadLinearSector:
+
+  # ecx contains the sector index, edx contains the pointer to the buffer to copy to which
+  # must be below 1MB
+  
+  push ebx
+  push edi
+  push ebp
+  mov ebp, esp
+
+  # allocate a call context
+  sub esp, RMCALLCTXT_SIZE
+  mov ebx, esp
+
+  # zero the context
+  push ecx
+  mov edi, ebx
+  mov ecx, RMCALLCTXT_SIZE
+  xor eax, eax
+  rep stosb
+  pop ecx
+
+  # Setup the call to int 0x13
+  mov eax, RM_LCOP_INTXX
+  mov dword ptr [ebx + RMCALLCTXT_OpCode], eax
+  mov eax, 0x13
+  mov dword ptr [ebx + RMCALLCTXT_Vector], eax
+
+  # Setup the output buffer
+  mov eax, edx
+  and eax, 0x0f
+  mov dword ptr [ebx + RMCALLCTXT_EBX], eax
+  shr edx, 4
+  mov dword ptr [ebx + RMCALLCTXT_ES], edx
+
+  # Work out the track index which goes in ch and the sector which goes in cl
+  # head in dl and drive in dh
+  mov eax, ecx
+  xor edx, edx
+  div dword ptr [FFloppySectorsPerTrack + 0x7c00]
+  # puts sector index - 1 in edx and track index in eax. Store just the sector
+  inc edx
+  mov dword ptr [ebx + RMCALLCTXT_ECX], edx
+  xor edx, edx
+  div dword ptr [FFloppyHeads + 0x7c00]
+  # puts head in edx and cylinder in eax
+  shl eax, 8
+  add eax, dword ptr [ebx + RMCALLCTXT_ECX]
+  mov dword ptr [ebx + RMCALLCTXT_ECX], eax
+  shl edx, 8
+  mov dword ptr [ebx + RMCALLCTXT_EDX], edx
+
+  # We always read a single sector
+  mov eax, 0x201
+  mov dword ptr [ebx + RMCALLCTXT_EAX], eax
 
   mov ecx, ebx
   call LeaveProtectedMode
@@ -628,12 +861,28 @@ SetupPageTables:
   ret
 .endfunc
 
+CallContextSeg:
+  .word 0
+CallContextOff:
+  .word 0
 RealModeIdtr:
   .word 0x1000
   .int 0
 ProtModeIdtr:
   .word 0x1000
   .int 0
+InvalidKernelFileTable:
+  .asciz "KFT Invalid"
+Stage2TooBigMessage:
+  .asciz "Stage2 too big"
+LoadingNextSector:
+  .asciz "Loading sector\r\n"
+InvalidStage2Image:
+  .asciz "Invalid stage 2 image\r\n"
+FFloppySectorsPerTrack:
+  .int 18
+FFloppyHeads:
+  .short 2
 
 .fill (0x9fe-(.-_start)), 1, 0 # Pad with nulls to to 5 sectors
 Tag2:

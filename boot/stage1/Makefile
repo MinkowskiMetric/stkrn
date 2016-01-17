@@ -14,5 +14,5 @@ boot.floppy: boot.bin
 	dd bs=512 if=boot.bin of=boot.floppy conv=nocreat,notrunc count=5 seek=0
 
 clean:
-	rm boot.o boot.bin boot.out boot.floppy
+	rm -f boot.o boot.bin boot.out boot.floppy
 
