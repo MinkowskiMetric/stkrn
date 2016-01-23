@@ -53,12 +53,23 @@ stage2_entry:
   
 .endfunc
 
-.global BlPrint
-.func BlPrint
-BlPrint:
+.global _ZN2bl5PrintEPKc
+.func _ZN2bl5PrintEPKc
+_ZN2bl5PrintEPKc:
   
   mov ecx, [esp + 4]
   call [BxPrint]
+  
+  ret
+  
+.endfunc
+
+.global _ZN2bl12CallRealModeEPNS_13RMCallContextE
+.func _ZN2bl12CallRealModeEPNS_13RMCallContextE
+_ZN2bl12CallRealModeEPNS_13RMCallContextE:
+
+  mov ecx, [esp + 4]
+  call [BxCallRealMode]
   
   ret
   

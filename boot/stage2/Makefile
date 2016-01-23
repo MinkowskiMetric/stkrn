@@ -4,7 +4,7 @@ ASMSOURCES=startup.S
 OBJECTS=$(SOURCES:.c=.o) $(CPPSOURCES:.cpp=.o) $(ASMSOURCES:.S=.o)
 EXECUTABLE=stage2
 LDFLAGS=-m32
-CFLAGS=-g -m32 -c -nostdinc++ -nobuiltininc
+CFLAGS=-g -m32 -c -std=c++11 -ffreestanding
 CPPFLAGS=$(CFLAGS)
 
 all: $(SOURCES) $(EXECUTABLE)
