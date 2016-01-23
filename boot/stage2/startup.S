@@ -13,6 +13,9 @@ STAGE2STARTCTX_Print:
 STAGE2STARTCTX_CallRealMode:
   .struct STAGE2STARTCTX_CallRealMode + 4
   .balign 4
+STAGE2STARTCTX_BootDiskNumber:
+  .struct STAGE2STARTCTX_BootDiskNumber + 4
+  .balign 4
 STAGE2STARTCTX_SIZE:
 
 .extern main
@@ -23,20 +26,21 @@ STAGE2STARTCTX_SIZE:
   # We need to start with a relative jmp to some other location
   jmp stage2_entry
   
-BxPrint:
-  .int 0
-BxCallRealMode:
-  .int 0
+  .balign 4
+StartContext:
+  .fill STAGE2STARTCTX_SIZE, 1, 0
+  .balign 4
+  
 Stage2ReturnedError:
   .asciz "ERROR! Stage2 returned!\r\n"
   
 .func stage2_entry
 stage2_entry:
-  # Save the parameters passed to us by the bootloader
-  mov eax, [ecx + STAGE2STARTCTX_Print]
-  mov [BxPrint], eax
-  mov eax, [ecx + STAGE2STARTCTX_CallRealMode]
-  mov [BxCallRealMode], eax
+  # Copy the start context
+  mov esi, ecx
+  lea edi, StartContext
+  mov ecx, STAGE2STARTCTX_SIZE
+  rep movsb
   
   # zero out the bss section
   lea edi, _BSS_START_
@@ -51,7 +55,7 @@ stage2_entry:
   
   # If we get here, main returned, which is bad.
   lea ecx, Stage2ReturnedError
-  call [BxPrint]
+  call BxPrint
   
 1:  
   cli
@@ -60,12 +64,28 @@ stage2_entry:
   
 .endfunc
 
+.func BxPrint
+BxPrint:
+
+  lea eax, [StartContext + STAGE2STARTCTX_Print]
+  jmp [eax]
+  
+.endfunc
+
+.func BxCallRealMode
+BxCallRealMode:
+
+  lea eax, [StartContext + STAGE2STARTCTX_CallRealMode]
+  jmp [eax]
+  
+.endfunc
+
 .global RlPrint
 .func RlPrint
 RlPrint:
   
   mov ecx, [esp + 4]
-  call [BxPrint]
+  call BxPrint
   
   ret
   
@@ -76,8 +96,17 @@ RlPrint:
 RlCallRealMode:
 
   mov ecx, [esp + 4]
-  call [BxCallRealMode]
+  call BxCallRealMode
   
+  ret
+  
+.endfunc
+
+.global RlGetStartCtx
+.func RlGetStartCtx
+RlGetStartCtx:
+
+  lea eax, StartContext
   ret
   
 .endfunc

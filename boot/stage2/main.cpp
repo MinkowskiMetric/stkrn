@@ -32,6 +32,7 @@ extern "C" int main()
 	RlCallRealMode(&rmc);
 	
 	DbgPrintf("Hello %d\n", 42);
+	DbgPrintf("Boot drive is %d\n", RlGetStartCtx()->BootDiskNumber);
 	
 	return 0;
 }

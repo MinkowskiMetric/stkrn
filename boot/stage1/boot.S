@@ -65,6 +65,9 @@ STAGE2STARTCTX_Print:
 STAGE2STARTCTX_CallRealMode:
   .struct STAGE2STARTCTX_CallRealMode + 4
   .balign 4
+STAGE2STARTCTX_BootDiskNumber:
+  .struct STAGE2STARTCTX_BootDiskNumber + 4
+  .balign 4
 STAGE2STARTCTX_SIZE:
   
 # FILETABLE_HDR
@@ -189,7 +192,6 @@ stage1:
   mov es, cx
   mov ds, cx
   mov bp, sp
-  sti
 
   mov [iBootDrive], dl               # save the boot drive for later
 
@@ -568,9 +570,13 @@ Stage15Entry32:
   sub esp, STAGE2STARTCTX_SIZE
   mov ecx, esp
   
-  mov dword ptr [ecx + STAGE2STARTCTX_StructSize], 0x7c00 + offset STAGE2STARTCTX_SIZE
+  mov eax, STAGE2STARTCTX_SIZE
+  mov dword ptr [ecx + STAGE2STARTCTX_StructSize], eax
   mov dword ptr [ecx + STAGE2STARTCTX_Print], 0x7c00 + offset PMPrint
   mov dword ptr [ecx + STAGE2STARTCTX_CallRealMode], 0x7c00 + offset LeaveProtectedMode
+  mov eax, 0x7c00 + offset iBootDrive
+  movzx eax, byte ptr [eax]
+  mov dword ptr [ecx + STAGE2STARTCTX_BootDiskNumber], eax
   
   # Then call into the stage 2 loader
   mov eax, STAGE2_BASE_ADDRESS
