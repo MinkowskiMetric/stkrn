@@ -1,5 +1,6 @@
 #include <rtl.h>
 #include "real.h"
+#include "memory.h"
 
 extern "C" void BlPrintCharacter(char c)
 {
@@ -19,10 +20,8 @@ extern "C" void BlPrintCharacter(char c)
 	RlCallRealMode(&rmc);
 }
 
-extern "C" int main()
+void BlClearScreen(void)
 {
-	RlPrint("running in C++\r\n");
-	
 	RMCallContext rmc;
 	RtlZeroMemory(&rmc, sizeof(rmc));
 	
@@ -30,9 +29,14 @@ extern "C" int main()
     rmc.Vector = 0x10;
     rmc.EAX = 0x02;
 	RlCallRealMode(&rmc);
+}
+
+extern "C" int main()
+{
+	BlClearScreen();
+	DbgPrintf("Entering stage 2 bootloader, loading from device %u\n", RlGetStartCtx()->BootDiskNumber);
 	
-	DbgPrintf("Hello %d\n", 42);
-	DbgPrintf("Boot drive is %d\n", RlGetStartCtx()->BootDiskNumber);
+	MemInitialize();
 	
 	return 0;
 }

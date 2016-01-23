@@ -1,4 +1,4 @@
-SOURCES=
+SOURCES=memory.c
 CPPSOURCES=main.cpp
 ASMSOURCES=startup.S
 OBJECTS=$(SOURCES:.c=.o) $(CPPSOURCES:.cpp=.o) $(ASMSOURCES:.S=.o)
@@ -12,7 +12,7 @@ CFLAGS=-g -m32 -c -std=c++11 -ffreestanding -nostdlib $(INCLUDES)
 all: $(SOURCES) $(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJECTS) $(LIBS)
-	clang++ $(LDFLAGS) $(OBJECTS) $(LIBS) -o $@
+	clang++ $(LDFLAGS) $(OBJECTS) $(LIBS) -lgcc -o $@
 
 .c.o .cpp.o:
 	clang++ $(CFLAGS) $< -o $@

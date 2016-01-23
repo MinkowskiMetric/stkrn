@@ -15,6 +15,33 @@ static void stdout_putc(void* p, char c)
 
 typedef void (*putcf) (void*,char);
 
+static void ulli2a(unsigned long long int num, unsigned int base, int uc,char * bf)
+    {
+    int n=0;
+    unsigned int d=1;
+    while (num/d >= base)
+        d*=base;         
+    while (d!=0) {
+        int dgt = num / d;
+        num%=d;
+        d/=base;
+        if (n || dgt>0|| d==0) {
+            *bf++ = dgt+(dgt<10 ? '0' : (uc ? 'A' : 'a')-10);
+            ++n;
+            }
+        }
+    *bf=0;
+    }
+
+static void lli2a (long long num, char * bf)
+    {
+    if (num<0) {
+        num=-num;
+        *bf++ = '-';
+        }
+    ulli2a(num,10,0,bf);
+    }
+
 static void uli2a(unsigned long int num, unsigned int base, int uc,char * bf)
     {
     int n=0;
@@ -120,7 +147,7 @@ void tfp_format(void* putp,putcf putf,const char *fmt, va_list va)
             putf(putp,ch);
         else {
             char lz=0;
-            char lng=0;
+            char lng=0, lnglng=0;
             int w=0;
             ch=*(fmt++);
             if (ch=='0') {
@@ -134,30 +161,40 @@ void tfp_format(void* putp,putcf putf,const char *fmt, va_list va)
                 ch=*(fmt++);
                 lng=1;
             }
+            if (lng && ch=='l') {
+				ch=*(fmt++);
+				lnglng=1;
+			}
             switch (ch) {
                 case 0: 
                     goto abort;
                 case 'u' : {
-                    if (lng)
+					if (lnglng)
+					    ulli2a(va_arg(va, unsigned long long int),10,0,bf);
+                    else if (lng)
                         uli2a(va_arg(va, unsigned long int),10,0,bf);
                     else
-                    ui2a(va_arg(va, unsigned int),10,0,bf);
+						ui2a(va_arg(va, unsigned int),10,0,bf);
                     putchw(putp,putf,w,lz,bf);
                     break;
                     }
                 case 'd' :  {
-                    if (lng)
+                    if (lnglng)
+					    lli2a(va_arg(va, unsigned long long int),bf);
+                    else if (lng)
                         li2a(va_arg(va, unsigned long int),bf);
                     else
-                    i2a(va_arg(va, int),bf);
-                    putchw(putp,putf,w,lz,bf);
+						i2a(va_arg(va, int),bf);
+					putchw(putp,putf,w,lz,bf);
                     break;
                     }
                 case 'x': case 'X' : 
-                    if (lng)
+					if (lnglng)
+					    ulli2a(va_arg(va, unsigned long long int),10,0,bf);
+                    else if (lng)
                         uli2a(va_arg(va, unsigned long int),16,(ch=='X'),bf);
                     else
-                    ui2a(va_arg(va, unsigned int),16,(ch=='X'),bf);
+						ui2a(va_arg(va, unsigned int),16,(ch=='X'),bf);
                     putchw(putp,putf,w,lz,bf);
                     break;
                 case 'c' : 
