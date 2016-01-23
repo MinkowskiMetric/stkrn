@@ -7,8 +7,8 @@ STAGE2 = ./stage2/stage2
 OTHERFILES = 
 
 .PHONY: subdirs clean $(SUBDIRS)
-
-all: subdirs
+	
+all: $(BOOTIMG)
 
 subdirs: $(SUBDIRS)
 
@@ -21,8 +21,6 @@ $(STAGE2): stage2
 
 $(BOOTIMG): $(SUBDIRS) $(STAGE1) $(STAGE2) $(OTHERFILES)
 	./imggen/imggen ./$(BOOTIMG) $(STAGE1) $(STAGE2) $(OTHERFILES)
-	
-all: $(BOOTIMG)
 
 clean:
 	cd stage1 && make clean

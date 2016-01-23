@@ -32,11 +32,18 @@ Stage2ReturnedError:
   
 .func stage2_entry
 stage2_entry:
+  # Save the parameters passed to us by the bootloader
   mov eax, [ecx + STAGE2STARTCTX_Print]
   mov [BxPrint], eax
-  
   mov eax, [ecx + STAGE2STARTCTX_CallRealMode]
   mov [BxCallRealMode], eax
+  
+  # zero out the bss section
+  lea edi, _BSS_START_
+  lea ecx, _BSS_END_
+  sub ecx, edi
+  xor eax, eax
+  rep stosb
   
   # We can carry on running on the bootloader stack for now
   # as it is big enough.
@@ -53,9 +60,9 @@ stage2_entry:
   
 .endfunc
 
-.global _ZN2bl5PrintEPKc
-.func _ZN2bl5PrintEPKc
-_ZN2bl5PrintEPKc:
+.global RlPrint
+.func RlPrint
+RlPrint:
   
   mov ecx, [esp + 4]
   call [BxPrint]
@@ -64,9 +71,9 @@ _ZN2bl5PrintEPKc:
   
 .endfunc
 
-.global _ZN2bl12CallRealModeEPNS_13RMCallContextE
-.func _ZN2bl12CallRealModeEPNS_13RMCallContextE
-_ZN2bl12CallRealModeEPNS_13RMCallContextE:
+.global RlCallRealMode
+.func RlCallRealMode
+RlCallRealMode:
 
   mov ecx, [esp + 4]
   call [BxCallRealMode]

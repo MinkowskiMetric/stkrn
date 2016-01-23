@@ -1,6 +1,10 @@
-namespace bl
-{
+#include <types.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+	
 struct RMCallContext
 {
 	unsigned int OpCode;
@@ -21,8 +25,9 @@ struct RMCallContext
 	unsigned int ReturnCR3;
 };
 
-void Print(const char* text);
-void CallRealMode(RMCallContext* context);
+void RlPrint(const char* text);
+void RlCallRealMode(RMCallContext* context);
 
+#ifdef __cplusplus
 }
-
+#endif

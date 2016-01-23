@@ -14,13 +14,24 @@ main:                                   # @main
 	movl	%esp, %ebp
 .Ltmp2:
 	.cfi_def_cfa_register %ebp
-	subl	$8, %esp
+	subl	$88, %esp
 	leal	.L.str, %eax
 	movl	$0, -4(%ebp)
 	movl	%eax, (%esp)
-	calll	BlPrint
+	calll	RlPrint
+	movl	$64, %eax
+	leal	-72(%ebp), %ecx
+	movl	%ecx, (%esp)
+	movl	$64, 4(%esp)
+	movl	%eax, -76(%ebp)         # 4-byte Spill
+	calll	RtlZeroMemory
+	leal	-72(%ebp), %eax
+	movl	$16, -68(%ebp)
+	movl	$2, -64(%ebp)
+	movl	%eax, (%esp)
+	calll	RlCallRealMode
 	xorl	%eax, %eax
-	addl	$8, %esp
+	addl	$88, %esp
 	popl	%ebp
 	retl
 .Ltmp3:
