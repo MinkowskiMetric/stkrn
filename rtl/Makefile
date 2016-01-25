@@ -2,7 +2,7 @@ K_LIBNAME=rtl.ka
 BL_LIBNAME=rtl.bla
 U_LIBNAME=rtl.ua
 
-CMN_SOURCES=memory.c printf.c
+CMN_SOURCES=memory.c printf.c list.c
 K_SOURCES=
 BL_SOURCES=
 U_SOURCES=

@@ -5,17 +5,17 @@ extern "C"
 {
 #endif
 	
-struct Stage2StartCtx
+typedef struct _Stage2StartCtx
 {
 	uint32_t Size;
 	uint32_t PrintFn;
 	uint32_t CallRealModeFn;
 	uint32_t BootDiskNumber;
-};
+} Stage2StartCtx;
 
 const Stage2StartCtx* RlGetStartCtx(void);
 
-struct RMCallContext
+typedef struct _RMCallContext
 {
 	uint32_t OpCode;
 	uint32_t Vector;
@@ -33,7 +33,7 @@ struct RMCallContext
 	uint32_t FuncPtr;
 	uint32_t ReturnESP;
 	uint32_t ReturnCR3;
-};
+} RMCallContext;
 
 #define EFLAG_CF     0x00000001
 #define EFLAG_PF     0x00000004

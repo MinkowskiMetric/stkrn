@@ -190,7 +190,7 @@ void tfp_format(void* putp,putcf putf,const char *fmt, va_list va)
                     }
                 case 'x': case 'X' : 
 					if (lnglng)
-					    ulli2a(va_arg(va, unsigned long long int),10,0,bf);
+					    ulli2a(va_arg(va, unsigned long long int),16,0,bf);
                     else if (lng)
                         uli2a(va_arg(va, unsigned long int),16,(ch=='X'),bf);
                     else
@@ -215,7 +215,7 @@ void tfp_format(void* putp,putcf putf,const char *fmt, va_list va)
 
 void DbgPrint(const char* string)
 {
-	while (*string)
+	for (; *string; ++string)
 		stdout_putc(0, *string);
 }
 
@@ -230,4 +230,19 @@ void DbgPrintf(const char* fmt, ...)
 void DbgPrintf_v(const char* fmt, va_list args)
 {
     tfp_format(0,stdout_putc,fmt,args);
+}
+
+void Panic(const char* fmt)
+{
+	DbgPrint(fmt);
+    
+    // TODOTODOTODO - this is fine in the bootloader. Less good otherwise
+    for (;;);
+}
+
+void DbgAssertFailed(const char* filename, int line, const char* message)
+{
+	DbgPrintf("Assert failed:- %s (%d)\n", filename, line);
+	DbgPrintf("    %s\n", message);
+	Panic("ASSERT FAILED!\n");
 }
